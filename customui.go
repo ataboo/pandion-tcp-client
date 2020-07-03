@@ -28,10 +28,8 @@ func (e *enterEntry) KeyDown(key *fyne.KeyEvent) {
 	}
 }
 
-func showTCPConnectDialog(window fyne.Window, callback func(bool)) {
-	addressInput := widget.NewEntry()
-	addressInput.PlaceHolder = "192.168.1.1:2345"
-	content := widget.NewForm(widget.NewFormItem("Address", addressInput))
+func showTCPConnectDialog(window fyne.Window, callback func(bool), addressWidget *widget.Entry) {
+	content := widget.NewForm(widget.NewFormItem("Address", addressWidget))
 
 	dialog.NewCustomConfirm("TCP Connect", "Connect", "Cancel", content, callback, window).Show()
 }

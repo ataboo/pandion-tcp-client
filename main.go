@@ -1,56 +1,89 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"fyne.io/fyne"
 	"fyne.io/fyne/app"
-	"fyne.io/fyne/driver/desktop"
 	"fyne.io/fyne/layout"
 	"fyne.io/fyne/widget"
+	"github.com/ataboo/pandion-tcp-client/client"
+	"github.com/ataboo/pandion-tcp-client/linebuffer"
 )
 
+func drawLineBuffer(responseText *widget.TextGrid, lineBuffer *linebuffer.LineBuffer, scrollView *widget.ScrollContainer) {
+	text := ""
+
+	for i := lineBuffer.Count() - 1; i >= 0; i-- {
+		line, err := lineBuffer.Get(i)
+		if err != nil {
+			log.Fatal("Failed to get line")
+		}
+
+		if i < lineBuffer.Count()-1 {
+			text += "\n"
+		}
+
+		text += line
+	}
+
+	responseText.SetText(text)
+	scrollView.Refresh()
+	scrollView.Scrolled(&fyne.ScrollEvent{
+		DeltaY: -100,
+	})
+}
+
 func main() {
-	os.Setenv("FYNE_SCALE", "1.5")
+	var tcpClient *client.TcpClient
+	buffer := linebuffer.NewLineBuffer(100)
 
 	a := app.New()
 
-	w := a.NewWindow("Hello")
+	w := a.NewWindow("Pandion TCP Client")
 	w.SetIcon(resourcePandionIconMintPng)
+
+	responseText := widget.NewTextGrid()
+	scrollingResponse := widget.NewVScrollContainer(responseText)
 
 	commandInput := newEnterEntry()
 	commandInput.OnEnter = func() {
-		fmt.Println("Got: " + commandInput.Text)
+		tcpClient.Send(commandInput.Text)
+		buffer.Push(commandInput.Text)
 		commandInput.SetText("")
+
+		drawLineBuffer(responseText, buffer, scrollingResponse)
 	}
-
-	responseText := widget.NewTextGrid()
-	responseText.SetText("First Row?\nsecond row?")
-
 	commandForm := widget.NewForm(widget.NewFormItem("Command", commandInput))
-
-	if deskCanvas, ok := w.Canvas().(desktop.Canvas); ok {
-		deskCanvas.SetOnKeyDown(func(ev *fyne.KeyEvent) {
-			fmt.Println("KeyDown: " + string(ev.Name))
-		})
-		deskCanvas.SetOnKeyUp(func(ev *fyne.KeyEvent) {
-			fmt.Println("KeyUp  : " + string(ev.Name))
-		})
-	}
-
-	content := fyne.NewContainerWithLayout(layout.NewBorderLayout(nil, commandForm, nil, nil), commandForm, responseText)
+	content := fyne.NewContainerWithLayout(layout.NewBorderLayout(nil, commandForm, nil, nil), commandForm, scrollingResponse)
 
 	w.SetContent(content)
-	w.Resize(fyne.NewSize(480, 320))
+
+	addressInput := widget.NewEntry()
+	addressInput.PlaceHolder = "127.0.0.1:3001"
 
 	showTCPConnectDialog(w, func(confirm bool) {
 		if confirm {
-			fmt.Println("Yes!")
+			tcpClient = client.NewTcpClient()
+			err := tcpClient.Connect(addressInput.Text)
+			if err != nil {
+				println("Connect failed")
+				os.Exit(1)
+			}
+
+			tcpClient.StartReadPump(func(line string) {
+				buffer.Push(line)
+				drawLineBuffer(responseText, buffer, scrollingResponse)
+			})
+
+			// fmt.Println("Yes!")
 		} else {
-			fmt.Println("No!")
+			// fmt.Println("No!")
 		}
-	})
+	}, addressInput)
+
+	w.Resize(fyne.NewSize(480, 320))
 
 	w.ShowAndRun()
 }
