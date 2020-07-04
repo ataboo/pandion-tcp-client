@@ -55,11 +55,11 @@ func main() {
 		responseBuffer.Write(readBuffer[:n])
 		responseBuffer.WriteString("_response")
 
-		fmt.Printf("response: %s\n", responseBuffer.String())
-
-		_, err = responseBuffer.WriteTo(conn)
+		n64, err := responseBuffer.WriteTo(conn)
 		if err != nil {
 			fmt.Printf("Failed to write echo: %s", err)
 		}
+
+		fmt.Printf("Wrote response: %d", n64)
 	}
 }

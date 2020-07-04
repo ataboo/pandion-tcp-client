@@ -31,5 +31,7 @@ func (e *enterEntry) KeyDown(key *fyne.KeyEvent) {
 func showTCPConnectDialog(window fyne.Window, callback func(bool), addressWidget *widget.Entry) {
 	content := widget.NewForm(widget.NewFormItem("Address", addressWidget))
 
-	dialog.NewCustomConfirm("TCP Connect", "Connect", "Cancel", content, callback, window).Show()
+	connectionDialog := dialog.NewCustomConfirm("TCP Connect", "Connect", "Cancel", content, callback, window)
+	connectionDialog.Show()
+
 }

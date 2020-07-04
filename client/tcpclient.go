@@ -1,87 +1,92 @@
 package client
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"net"
-	"sync"
-	"time"
 )
 
-type TcpClient struct {
-	conn     net.Conn
-	lock     sync.Mutex
-	stopChan chan int
+var _ = (io.ReadWriteCloser)(&TCPClient{})
+
+// TCPClient wraps net's tcpclient
+type TCPClient struct {
+	address string
+	conn    net.Conn
+	buffer  *bytes.Buffer
 }
 
-func NewTcpClient() *TcpClient {
-	return &TcpClient{
-		lock: sync.Mutex{},
+// NewTCPClient create a new TCPClient
+func NewTCPClient(address string) *TCPClient {
+	return &TCPClient{
+		address: address,
+		conn:    nil,
+		buffer:  bytes.NewBuffer(make([]byte, 1024)),
 	}
 }
 
-func (c *TcpClient) Connect(address string) error {
-	conn, err := net.Dial("tcp", address)
+// Connect dial the tcp connection.
+func (c *TCPClient) Connect() error {
+	conn, err := net.Dial("tcp", c.address)
 	c.conn = conn
 
 	return err
 }
 
-func (c *TcpClient) Send(message string) error {
+func (c *TCPClient) Write(msg []byte) (n int, err error) {
+	if c.conn == nil {
+		return 0, fmt.Errorf("No connection started")
+	}
+
+	return c.conn.Write(msg)
+}
+
+func (c *TCPClient) Read(b []byte) (n int, err error) {
+	if c.conn == nil {
+		return 0, fmt.Errorf("No connection started")
+	}
+
+	return c.conn.Read(b)
+}
+
+// ReadString Read a string from the connection.
+func (c *TCPClient) ReadString() (str string, err error) {
+	if c.conn == nil {
+		return "", fmt.Errorf("No connection started")
+	}
+
+	tempBuffer := make([]byte, 1024)
+
+	c.buffer.Reset()
+	n, err := c.conn.Read(tempBuffer)
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Printf("Read %d bytes", n)
+
+	return string(tempBuffer[:n]), nil
+}
+
+//WriteString write a string to the connection.
+func (c *TCPClient) WriteString(message string) error {
 	if c.conn == nil {
 		return fmt.Errorf("No connection started")
 	}
+
 	_, err := c.conn.Write([]byte(message))
 
 	return err
 }
 
-func (c *TcpClient) Read() (string, error) {
-	if c.conn == nil {
-		return "", fmt.Errorf("No connection started")
-	}
-	reader := bufio.NewReader(c.conn)
-	if reader.Buffered() == 0 {
-		return "", fmt.Errorf("Nothing to read from connection")
-	}
-	str, err := reader.ReadString('\n')
-
-	return str, err
-}
-
-func (c *TcpClient) StartReadPump(handleLine func(line string)) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.stopChan != nil {
-		return fmt.Errorf("Read pump already started.")
-	}
-
-	c.stopChan = make(chan int)
-	tickChan := time.Tick(time.Second)
-	go func() {
-		for {
-			select {
-			case <-c.stopChan:
-				return
-			case <-tickChan:
-				line, err := c.Read()
-				if err != nil {
-					handleLine(line)
-				}
-			}
-		}
-	}()
-
-	return nil
-}
-
-func (c *TcpClient) Close() error {
+// Close Close the connection.
+func (c *TCPClient) Close() error {
 	if c.conn == nil {
 		return fmt.Errorf("No connection to close")
 	}
 
 	c.conn.Close()
+	c.conn = nil
 
 	return nil
 }
