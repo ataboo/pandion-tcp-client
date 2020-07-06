@@ -112,6 +112,8 @@ func promptForTCPConnection(w fyne.Window, addressInput *widget.Entry) {
 }
 
 func sendCommandText(command string) (response string, err error) {
+	defer tcpClient.Close()
+
 	if tcpClient == nil {
 		return "", fmt.Errorf("client is not initialized")
 	}
