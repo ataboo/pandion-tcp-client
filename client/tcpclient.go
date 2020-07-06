@@ -3,11 +3,9 @@ package client
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net"
+	"time"
 )
-
-var _ = (io.ReadWriteCloser)(&TCPClient{})
 
 // TCPClient wraps net's tcpclient
 type TCPClient struct {
@@ -33,22 +31,6 @@ func (c *TCPClient) Connect() error {
 	return err
 }
 
-func (c *TCPClient) Write(msg []byte) (n int, err error) {
-	if c.conn == nil {
-		return 0, fmt.Errorf("No connection started")
-	}
-
-	return c.conn.Write(msg)
-}
-
-func (c *TCPClient) Read(b []byte) (n int, err error) {
-	if c.conn == nil {
-		return 0, fmt.Errorf("No connection started")
-	}
-
-	return c.conn.Read(b)
-}
-
 // ReadString Read a string from the connection.
 func (c *TCPClient) ReadString() (str string, err error) {
 	if c.conn == nil {
@@ -58,6 +40,7 @@ func (c *TCPClient) ReadString() (str string, err error) {
 	tempBuffer := make([]byte, 1024)
 
 	c.buffer.Reset()
+	c.conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	n, err := c.conn.Read(tempBuffer)
 	if err != nil {
 		return "", err
@@ -74,6 +57,7 @@ func (c *TCPClient) WriteString(message string) error {
 		return fmt.Errorf("No connection started")
 	}
 
+	c.conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
 	_, err := c.conn.Write([]byte(message))
 
 	return err

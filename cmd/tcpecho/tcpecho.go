@@ -1,15 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net"
 	"os"
 )
-
-type TCPEchoServer struct {
-}
 
 func main() {
 	args := os.Args
@@ -20,7 +16,6 @@ func main() {
 	}
 
 	addr := args[1]
-	responseBuffer := bytes.NewBuffer(make([]byte, 1024))
 	readBuffer := make([]byte, 1024)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
@@ -49,17 +44,23 @@ func main() {
 			return
 		}
 
-		fmt.Printf("Got line: %s\n", string(readBuffer))
+		fmt.Printf("Got line: %s\n", string(readBuffer[:n]))
 
-		responseBuffer.Reset()
-		responseBuffer.Write(readBuffer[:n])
-		responseBuffer.WriteString("_response")
+		if string(readBuffer[:n]) == "ping" {
+			_, err := conn.Write([]byte("pong"))
+			if err != nil {
+				fmt.Printf("Failed to write echo: %s", err)
+			}
+		} else if string(readBuffer[:n]) == "ping2" {
+			_, err := conn.Write([]byte("pong1\n"))
+			if err != nil {
+				fmt.Printf("Failed to write echo: %s\n", err)
+			}
 
-		n64, err := responseBuffer.WriteTo(conn)
-		if err != nil {
-			fmt.Printf("Failed to write echo: %s", err)
+			_, err = conn.Write([]byte("pong2\n"))
+			if err != nil {
+				fmt.Printf("Failed to write echo: %s\n", err)
+			}
 		}
-
-		fmt.Printf("Wrote response: %d", n64)
 	}
 }
